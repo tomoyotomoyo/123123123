@@ -15,16 +15,15 @@ def inject_dylib(binary_path, dylib_path):
     
     dylib_name = dylib_path
     name_len = len(dylib_name) + 1
-    load_dylib_size = 24 + 16 + name_len
+    load_dylib_size = 24 + name_len
     if load_dylib_size % 8 != 0:
         load_dylib_size += 8 - (load_dylib_size % 8)
     
     new_sizeofcmds = sizeofcmds + load_dylib_size
     new_ncmds = ncmds + 1
     
-    # Build LC_LOAD_DYLIB command
-    new_cmd = struct.pack('<II', 0x18, load_dylib_size)  # cmd=LC_LOAD_DYLIB, cmdsize
-    new_cmd += struct.pack('<IIII', 0x00000801, 0, name_len, 0)  # lib (offset=16), timestamp, name_size, build_version
+    # LC_LOAD_DYLIB: cmd(4) + cmdsize(4) + name_offset(4) + timestamp(4) + current_version(4) + compatibility_version(4) = 24 bytes header
+    new_cmd = struct.pack('<IIIIII', 0x18, load_dylib_size, 24, 0, 0, 0)
     new_cmd += dylib_name.encode('ascii') + b'\x00'
     pad_len = load_dylib_size - len(new_cmd)
     new_cmd += b'\x00' * pad_len
