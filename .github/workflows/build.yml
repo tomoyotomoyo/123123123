@@ -18,7 +18,7 @@ jobs:
 
       - name: Compile KFOverlay.dylib
         run: |
-          xcrun --sdk iphoneos --find clang \
+          xcrun --sdk iphoneos clang \
             -fPIC -shared -fobjc-arc -arch arm64 \
             -isysroot $(xcrun --sdk iphoneos --show-sdk-path) \
             -framework Foundation -framework UIKit -framework CoreGraphics \
