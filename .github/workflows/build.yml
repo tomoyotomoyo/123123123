@@ -5,6 +5,7 @@ on:
   push:
     paths:
       - 'KFOverlay_integrated.m'
+      - 'inject.py'
       - 'kfun.ipa'
 
 jobs:
@@ -14,13 +15,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Install insert_dylib
-        run: |
-          git clone https://github.com/Tyilo/insert_dylib.git
-          cd insert_dylib
-          make
-          cp insert_dylib /usr/local/bin/
 
       - name: Compile KFOverlay.dylib
         run: |
@@ -33,20 +27,30 @@ jobs:
 
       - name: Integrate into kfun.ipa
         run: |
+          # Unzip IPA
           unzip -o kfun.ipa -d work_dir
           APP_DIR=$(find work_dir -name "*.app" -type d | head -1)
           
+          # Copy dylib to Frameworks
           mkdir -p "$APP_DIR/Frameworks"
           cp KFOverlay.dylib "$APP_DIR/Frameworks/"
           
+          # Add LC_LOAD_DYLIB to kfun binary
           BINARY="$APP_DIR/kfun"
+          DYLIB="@executable_path/Frameworks/KFOverlay.dylib"
           
-          insert_dylib --inplace --weak \
-            "@executable_path/Frameworks/KFOverlay.dylib" \
-            "$BINARY"
+          python3 inject.py "$BINARY" "$DYLIB"
           
+          # Create TrollFools marker (optional, for compatibility)
           touch "$APP_DIR/.troll-fools"
           
+          # Verify the injection
+          echo "=== Verify Mach-O ==="
+          file "$BINARY"
+          echo "=== Check for LC_LOAD_DYLIB ==="
+          otool -L "$BINARY" 2>/dev/null || true
+          
+          # Repackage IPA
           cd work_dir
           zip -r ../kfun_with_overlay.ipa Payload/
 
