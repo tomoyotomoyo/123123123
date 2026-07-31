@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>DFM Radar</title>
+<style>
+:root{--bg:#0d1117;--card:rgba(22,27,34,0.92);--border:rgba(48,54,61,0.8);--accent:#58a6ff;--gold:#ffc857;--red:#f85149;--green:#3fb950;--gray:#8b949e;--white:#e6edf3}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:var(--white)}
+canvas{display:block}
+
+#topBar{position:fixed;top:0;left:0;right:0;height:42px;background:transparent;z-index:15;display:flex;align-items:center;justify-content:space-between;padding:0 16px;pointer-events:none}
+#topBar>*{pointer-events:auto}
+#topBar .left,.right{display:flex;align-items:center;gap:12px}
+#topBar .badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600}
+.badge-red{background:rgba(248,81,73,0.15);color:var(--red)}
+.badge-gray{background:rgba(139,148,158,0.15);color:var(--gray)}
+.badge-green{background:rgba(63,185,80,0.15);color:var(--green)}
+.badge-gold{background:rgba(255,200,87,0.15);color:var(--gold)}
+.badge-blue{background:rgba(88,166,255,0.15);color:var(--accent)}
+#topBar .dot{width:6px;height:6px;border-radius:50%;display:inline-block}
+.dot-green{background:var(--green)}.dot-red{background:var(--red)}.dot-yellow{background:var(--gold)}
+#topBar .title{font-size:13px;font-weight:700;color:var(--white);letter-spacing:0.5px}
+#ping{font-size:11px;color:var(--gray)}
+
+#menuBtn{position:fixed;bottom:20px;right:20px;z-index:25;width:48px;height:48px;border-radius:14px;border:1px solid var(--border);background:var(--card);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);color:var(--white);font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;box-shadow:0 4px 16px rgba(0,0,0,0.3)}
+#menuBtn:hover{background:rgba(48,54,61,0.9);transform:scale(1.05)}
+
+#panel{position:fixed;bottom:78px;right:20px;background:var(--card);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--border);padding:16px 20px;border-radius:16px;z-index:25;display:none;flex-direction:column;gap:14px;min-width:300px;box-shadow:0 8px 32px rgba(0,0,0,0.4)}
+#panel .sec{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+#panel .sec-title{color:var(--gray);font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}
+#panel label{color:var(--white);font-size:12px;cursor:pointer;display:flex;align-items:center;gap:4px;padding:4px 8px;border-radius:8px;background:rgba(255,255,255,0.04);border:1px solid transparent;transition:all .15s;white-space:nowrap}
+#panel label:hover{background:rgba(255,255,255,0.08);border-color:var(--border)}
+#panel input[type=checkbox]{accent-color:var(--accent)}
+#viewBtns{display:flex;gap:6px}
+#viewBtns button{padding:6px 16px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--gray);font-size:12px;cursor:pointer;transition:all .2s;font-weight:500}
+#viewBtns button:hover{border-color:var(--accent);color:var(--accent)}
+#viewBtns button.active{background:var(--accent);border-color:var(--accent);color:#fff}
+
+#zoom{position:fixed;left:16px;top:50%;transform:translateY(-50%);z-index:15;display:flex;flex-direction:column;align-items:center;gap:6px;background:var(--card);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid var(--border);padding:10px 6px;border-radius:14px;box-shadow:0 4px 16px rgba(0,0,0,0.3)}
+#zoom button{width:32px;height:32px;border:none;border-radius:8px;background:rgba(255,255,255,0.06);color:var(--white);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
+#zoom button:hover{background:rgba(255,255,255,0.12)}
+#zoomSlider{-webkit-appearance:slider-vertical;appearance:slider-vertical;width:24px;height:160px;outline:none;cursor:pointer;opacity:0.7}
+#zoomLabel{color:var(--gray);font-size:10px}
+
+#roomPanel{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:100;background:var(--card);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid var(--border);padding:28px 36px;border-radius:20px;color:var(--white);text-align:center;min-width:300px;box-shadow:0 16px 48px rgba(0,0,0,0.5)}
+#roomPanel .room-title{font-size:18px;font-weight:700;margin-bottom:20px;letter-spacing:0.5px}
+#roomPanel .room-btn{display:block;width:100%;padding:12px;margin:8px 0;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--white);font-size:14px;cursor:pointer;transition:all .2s}
+#roomPanel .room-btn:hover{background:var(--accent);border-color:var(--accent);color:#fff}
+#roomPanel input{padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,0.06);color:var(--white);font-size:14px;width:160px;outline:none;transition:border .2s}
+#roomPanel input:focus{border-color:var(--accent)}
+#roomPanel .join-btn{padding:10px 20px;border-radius:10px;border:none;background:var(--accent);color:#fff;font-size:14px;cursor:pointer;font-weight:600;transition:all .2s}
+#roomPanel .join-btn:hover{opacity:0.85}
+</style>
+</head>
+<body>
+
+<div id="topBar">
+  <div class="left">
+    <span class="title">DFM RADAR</span>
+    <span id="status" class="badge badge-blue"><span class="dot dot-yellow"></span>连接中</span>
+  </div>
+  <div id="info"></div>
+  <div class="right">
+    <span id="ping">--</span>
+  </div>
+</div>
+
+<div id="roomPanel">
+  <div class="room-title">选择房间</div>
+  <div id="roomList"></div>
+  <div style="display:flex;gap:8px;justify-content:center;align-items:center;margin-top:12px">
+    <input id="roomInput" placeholder="输入房间号">
+    <button class="join-btn" onclick="joinRoom()">加入</button>
+  </div>
+</div>
+
+<div id="zoom">
+  <button id="zoomIn">+</button>
+  <input type="range" id="zoomSlider" min="1" max="100" value="20" orient="vertical">
+  <button id="zoomOut">-</button>
+  <div id="zoomLabel">100%</div>
+</div>
+
+<button id="menuBtn" onclick="toggleMenu()">&#9776;</button>
+<div id="panel">
+  <div class="sec-title">视角</div>
+  <div id="viewBtns">
+    <button id="viewFree" class="active" onclick="setView('free')">自由</button>
+    <button id="viewFollow" onclick="setView('follow')">跟随</button>
+  </div>
+  <div class="sec-title">玩家</div>
+  <div class="sec">
+    <label><input type="checkbox" id="chkName" checked>名称</label>
+    <label><input type="checkbox" id="chkHealth" checked>血量</label>
+    <label><input type="checkbox" id="chkHelmet" checked>头甲包</label>
+    <label><input type="checkbox" id="chkArmor" checked style="display:none">护甲</label>
+    <label><input type="checkbox" id="chkWeapon" checked>武器</label>
+    <label><input type="checkbox" id="chkDir" checked>朝向</label>
+    <label><input type="checkbox" id="chkAI" checked>人机</label>
+  </div>
+  <div class="sec-title">物资</div>
+  <div class="sec">
+    <label><input type="checkbox" id="chkItems" checked>物资</label>
+    <label style="color:#58a6ff"><input type="checkbox" id="chkQ3" checked>蓝</label>
+    <label style="color:#bc8cff"><input type="checkbox" id="chkQ4" checked>紫</label>
+    <label style="color:#ffc857"><input type="checkbox" id="chkQ5" checked>金</label>
+    <label style="color:#f85149"><input type="checkbox" id="chkQ6" checked>红</label>
+    <label><input type="checkbox" id="chkKeys" checked>钥匙房</label>
+    <label><input type="checkbox" id="chkDeadBox" checked>死亡盒</label>
+  </div>
+  <div class="sec-title">容器 <span style="font-size:9px;color:var(--accent);cursor:pointer" onclick="document.getElementById('boxDetail').style.display=document.getElementById('boxDetail').style.display==='none'?'flex':'none'">[展开]</span></div>
+  <div class="sec">
+    <label><input type="checkbox" id="chkBoxAll" checked onchange="toggleAllBoxes(this.checked)">全部容器</label>
+  </div>
+  <div id="boxDetail" class="sec" style="display:none;flex-wrap:wrap;gap:4px">
+    <label><input type="checkbox" id="box_快递箱" checked>快递箱</label>
+    <label><input type="checkbox" id="box_医疗包" checked>医疗包</label>
+    <label><input type="checkbox" id="box_收纳盒" checked>收纳盒</label>
+    <label><input type="checkbox" id="box_电脑机箱" checked>电脑机箱</label>
+    <label><input type="checkbox" id="box_垃圾箱" checked>垃圾箱</label>
+    <label><input type="checkbox" id="box_抽屉柜" checked>抽屉柜</label>
+    <label><input type="checkbox" id="box_一件衣服" checked>衣服</label>
+    <label><input type="checkbox" id="box_保险箱" checked>保险箱</label>
+    <label><input type="checkbox" id="box_小保险箱" checked>小保险箱</label>
+    <label><input type="checkbox" id="box_大武器箱" checked>大武器箱</label>
+    <label><input type="checkbox" id="box_旅行包" checked>旅行包</label>
+    <label><input type="checkbox" id="box_鸟窝" checked>鸟窝</label>
+    <label><input type="checkbox" id="box_弹药箱" checked>弹药箱</label>
+    <label><input type="checkbox" id="box_高级旅行箱" checked>高级旅行箱</label>
+    <label><input type="checkbox" id="box_工具柜" checked>工具柜</label>
+    <label><input type="checkbox" id="box_服务器" checked>服务器</label>
+    <label><input type="checkbox" id="box_手提箱" checked>手提箱</label>
+    <label><input type="checkbox" id="box_医疗物资堆" checked>医疗物资堆</label>
+    <label><input type="checkbox" id="box_航空储物箱" checked>航空储物箱</label>
+    <label><input type="checkbox" id="box_藏匿物" checked>藏匿物</label>
+    <label><input type="checkbox" id="box_野外物资箱" checked>野外物资箱</label>
+    <label><input type="checkbox" id="box_登山包" checked>登山包</label>
+    <label><input type="checkbox" id="box_高级储物箱" checked>高级储物箱</label>
+    <label><input type="checkbox" id="box_空投" checked>空投</label>
+  </div>
+</div>
+
+<script>
+let canvas,ctx,img,scale=1,offsetX=0,offsetY=0,isDragging=false,dragStart={x:0,y:0};
+let players=[],items=[],keyRooms=[],boxes=[],selectedName=null,selectedTeam=null,teamColors={},lastTouchDist=0;
+let mapName="未知",imgLoaded=false,viewMode="free";
+let g_ws=null,g_roomId=null,g_lastDataTime=0,g_pingMs=0,g_pingStarted=false;
+
+function toggleMenu(){let p=document.getElementById("panel");p.style.display=p.style.display==="flex"?"none":"flex";}
+function setView(m){viewMode=m;document.getElementById("viewFree").className=m==="free"?"active":"";document.getElementById("viewFollow").className=m==="follow"?"active":"";}
+function toggleAllBoxes(on){document.querySelectorAll('[id^="box_"]').forEach(el=>el.checked=on);}
+const boxNameMap={"哈夫克返回舱":"空投"};
+function imColorToCSS(c){
+    if(!c)return"#00d2d2";
+    let r=c&0xFF,g=(c>>8)&0xFF,b=(c>>16)&0xFF;
+    return"rgb("+r+","+g+","+b+")";
+}
+function isBoxVisible(name){
+    if(!document.getElementById("chkBoxAll").checked)return false;
+    let mapped=boxNameMap[name]||name;
+    let el=document.getElementById("box_"+mapped);
+    return el?el.checked:true;
+}
+
+const mapFiles={"零号大坝":"db","长弓溪谷":"cg","航天基地":"ht","巴克什":"bks","潮汐监狱":"cxjy","大厅":"db","未知":"db"};
+function worldToImgPixel(wx,wy){let mx=wx+357353.3,my=wy+(-769882);return{x:0.02482745*mx-6847.523,y:0.0253012*my+21028.91};}
+const colorMap={"none":"transparent","white":"#e6edf3","blue":"#58a6ff","purple":"#bc8cff","gold":"#ffc857","red":"#f85149"};
+
+window.onload=()=>{
+    canvas=document.createElement("canvas");
+    document.body.insertBefore(canvas,document.body.firstChild);
+    ctx=canvas.getContext("2d");
+    canvas.addEventListener("mousedown",()=>{document.getElementById("panel").style.display="none";});
+    resizeCanvas();
+    img=new Image();
+    img.onload=()=>{imgLoaded=true;adjustImageToFit();drawMap();};
+    img.onerror=()=>{imgLoaded=false;};
+    img.src="db.jpg";
+
+    canvas.addEventListener("mousedown",e=>{dragStart={x:e.clientX-offsetX,y:e.clientY-offsetY};isDragging=true;});
+    canvas.addEventListener("mousemove",e=>{if(isDragging){offsetX=e.clientX-dragStart.x;offsetY=e.clientY-dragStart.y;drawMap();}});
+    canvas.addEventListener("mouseup",()=>isDragging=false);
+    canvas.addEventListener("wheel",e=>{e.preventDefault();let o=scale;scale*=e.deltaY<0?1.15:0.87;scale=Math.max(0.1,Math.min(scale,10));offsetX-=(e.clientX-offsetX)*(scale/o-1);offsetY-=(e.clientY-offsetY)*(scale/o-1);if(typeof syncSlider==="function")syncSlider();drawMap();},{passive:false});
+    canvas.addEventListener("click",e=>{let x=(e.clientX-offsetX)/scale,y=(e.clientY-offsetY)/scale;let cl=null,md=15/scale;players.forEach(p=>{let d=Math.sqrt((p.drawX-x)**2+(p.drawY-y)**2);if(d<md){md=d;cl=p;}});if(cl){selectedName=cl.name;selectedTeam=cl.team;}drawMap();});
+    canvas.addEventListener("touchstart",e=>{e.preventDefault();if(e.touches.length===1){dragStart={x:e.touches[0].clientX-offsetX,y:e.touches[0].clientY-offsetY};isDragging=true;}else if(e.touches.length===2)lastTouchDist=getTD(e.touches);},{passive:false});
+    canvas.addEventListener("touchmove",e=>{e.preventDefault();if(isDragging&&e.touches.length===1){offsetX=e.touches[0].clientX-dragStart.x;offsetY=e.touches[0].clientY-dragStart.y;drawMap();}else if(e.touches.length===2){let d=getTD(e.touches),f=d/lastTouchDist;lastTouchDist=d;let cx=(e.touches[0].clientX+e.touches[1].clientX)/2,cy=(e.touches[0].clientY+e.touches[1].clientY)/2;scale*=f;scale=Math.max(0.1,Math.min(scale,10));offsetX-=(cx-offsetX)*(f-1);offsetY-=(cy-offsetY)*(f-1);if(typeof syncSlider==="function")syncSlider();drawMap();}},{passive:false});
+    canvas.addEventListener("touchend",()=>{isDragging=false;lastTouchDist=0;},{passive:false});
+    window.addEventListener("resize",()=>{resizeCanvas();drawMap();});
+
+    let zs=document.getElementById("zoomSlider"),zl=document.getElementById("zoomLabel");
+    function s2v(s){return Math.round((Math.log(s)-Math.log(0.1))/(Math.log(10)-Math.log(0.1))*99+1);}
+    function v2s(v){return Math.exp(Math.log(0.1)+(v-1)/99*(Math.log(10)-Math.log(0.1)));}
+    window.syncSlider=function(){zs.value=s2v(scale);zl.textContent=Math.round(scale*100)+"%";};
+    zs.addEventListener("input",()=>{let ns=v2s(parseFloat(zs.value)),cx=innerWidth/2,cy=innerHeight/2;offsetX-=(cx-offsetX)*(ns/scale-1);offsetY-=(cy-offsetY)*(ns/scale-1);scale=ns;syncSlider();drawMap();});
+    document.getElementById("zoomIn").addEventListener("click",()=>{let o=scale;scale=Math.min(scale*1.3,10);let cx=innerWidth/2,cy=innerHeight/2;offsetX-=(cx-offsetX)*(scale/o-1);offsetY-=(cy-offsetY)*(scale/o-1);syncSlider();drawMap();});
+    document.getElementById("zoomOut").addEventListener("click",()=>{let o=scale;scale=Math.max(scale/1.3,0.1);let cx=innerWidth/2,cy=innerHeight/2;offsetX-=(cx-offsetX)*(scale/o-1);offsetY-=(cy-offsetY)*(scale/o-1);syncSlider();drawMap();});
+    connectWS();
+};
+
+function resizeCanvas(){let d=window.devicePixelRatio||1;canvas.width=innerWidth*d;canvas.height=innerHeight*d;canvas.style.width=innerWidth+"px";canvas.style.height=innerHeight+"px";ctx.setTransform(d,0,0,d,0,0);}
+function getTD(t){let dx=t[0].clientX-t[1].clientX,dy=t[0].clientY-t[1].clientY;return Math.sqrt(dx*dx+dy*dy);}
+function adjustImageToFit(){if(!img||!img.width)return;let ar=img.width/img.height,war=innerWidth/innerHeight;scale=ar>war?innerWidth/img.width:innerHeight/img.height;offsetX=(innerWidth-img.width*scale)/2;offsetY=(innerHeight-img.height*scale)/2;if(typeof syncSlider==="function")syncSlider();}
+
+function startPingLoop(){if(g_pingStarted)return;g_pingStarted=true;setInterval(()=>{let pe=document.getElementById("ping");if(g_pingMs>0){let c=g_pingMs<80?"var(--green)":g_pingMs<150?"var(--gold)":"var(--red)";pe.innerHTML='<span style="color:'+c+'">'+g_pingMs+'ms</span>';}},2000);}
+
+function joinRoom(id){let r=id||document.getElementById("roomInput").value.trim();if(!r)return;g_roomId=r;document.getElementById("roomPanel").style.display="none";if(g_ws&&g_ws.readyState===1){g_ws.send(JSON.stringify({type:"join",room:r}));setStatus("yellow","房间 "+r);}}
+function showRoomPanel(rooms){let el=document.getElementById("roomList");el.innerHTML="";if(rooms&&rooms.length>0){rooms.forEach(r=>{let b=document.createElement("button");b.className="room-btn";b.textContent=r.id+" ("+r.viewers+"人)";b.onclick=()=>joinRoom(r.id);el.appendChild(b);});}else{el.innerHTML='<div style="color:var(--gray);margin:12px 0">暂无活跃房间</div>';}document.getElementById("roomPanel").style.display="block";}
+
+function setStatus(color,text){let s=document.getElementById("status");let dotClass=color==="green"?"dot-green":color==="red"?"dot-red":"dot-yellow";s.innerHTML='<span class="dot '+dotClass+'"></span>'+text;}
+
+function connectWS(){let url="ws://"+window.location.host;setStatus("yellow","连接中");try{let ws=new WebSocket(url);g_ws=ws;
+ws.onopen=()=>{setStatus("yellow","选择房间");startPingLoop();if(g_roomId)ws.send(JSON.stringify({type:"join",room:g_roomId}));};
+ws.onclose=()=>{setStatus("red","已断开");setTimeout(connectWS,3000);};
+ws.onerror=()=>{};
+ws.onmessage=e=>{try{let d=JSON.parse(e.data);
+if(d.type==="room_list"){if(!g_roomId)showRoomPanel(d.rooms);return;}
+if(d.type==="joined"){setStatus("green","房间: "+d.room);document.getElementById("roomPanel").style.display="none";return;}
+if(d.type==="map"&&d.map){mapName=d.map;let mf=mapFiles[d.map]||"db";if(img.src.indexOf(mf+".jpg")===-1)img.src=mf+".jpg";}
+if(d.type==="update"){
+    let now=Date.now();if(g_lastDataTime>0){g_pingMs=now-g_lastDataTime;if(g_pingMs>1000)g_pingMs=0;}g_lastDataTime=now;
+    if(d.map){mapName=d.map;let mf=mapFiles[d.map]||"db";if(img.src.indexOf(mf+".jpg")===-1)img.src=mf+".jpg";}
+    if(Array.isArray(d.players))players=d.players.map(p=>{let pos=worldToImgPixel(p.x,p.y);return{...p,drawX:pos.x,drawY:pos.y};});
+    if(Array.isArray(d.items))items=d.items.map(i=>{let pos=worldToImgPixel(i.x,i.y);return{...i,drawX:pos.x,drawY:pos.y};});
+    if(Array.isArray(d.keys))keyRooms=d.keys.map(k=>{let pos=worldToImgPixel(k.x,k.y);return{...k,drawX:pos.x,drawY:pos.y};});
+    if(Array.isArray(d.boxes))boxes=d.boxes.map(b=>{let pos=worldToImgPixel(b.x,b.y);return{...b,drawX:pos.x,drawY:pos.y};});
+    let rc=players.filter(p=>!p.isAi&&p.name!=="我").length,ac=players.filter(p=>p.isAi).length,ic=items?items.length:0,vc=d.viewers||0;
+    document.getElementById("info").innerHTML=
+        '<span class="badge badge-red">真人 '+rc+'</span> '+
+        '<span class="badge badge-gray">人机 '+ac+'</span> '+
+        '<span class="badge badge-green">物资 '+ic+'</span> '+
+        '<span class="badge badge-gold">观看 '+vc+'</span>';
+    drawMap();
+}}catch(err){console.error(err);}};
+}catch(e){setStatus("red","异常");setTimeout(connectWS,3000);}}
+
+function drawMap(){
+    if(!ctx||!canvas)return;
+    if(viewMode==="follow"){let me=players.find(p=>p.name==="我");if(me){offsetX=innerWidth/2-me.drawX*scale;offsetY=innerHeight/2-me.drawY*scale;}}
+    ctx.clearRect(0,0,innerWidth,innerHeight);
+    ctx.fillStyle="#0d1117";ctx.fillRect(0,0,innerWidth,innerHeight);
+    if(imgLoaded&&img.complete&&img.width>0){ctx.save();ctx.translate(offsetX,offsetY);ctx.scale(scale,scale);ctx.drawImage(img,0,0);ctx.restore();}
+    if(document.getElementById("chkKeys").checked)drawKeyRooms();
+    drawBoxes();
+    if(document.getElementById("chkItems").checked)drawItems();
+    drawPlayers();
+    if(document.getElementById("chkItems").checked)drawValuableList();
+    drawRedSquares();
+}
+
+// === KFOverlay: Draw 10x10 red squares for isAi=false players ===
+function drawRedSquares(){
+    players.forEach(p=>{
+        if(p.isAi) return;
+        let px=p.drawX*scale+offsetX, py=p.drawY*scale+offsetY;
+        if(px<-20||px>innerWidth+20||py<-20||py>innerHeight+20) return;
+        ctx.save();
+        ctx.fillStyle="#ff0000";
+        ctx.fillRect(px-5, py-5, 10, 10);
+        ctx.strokeStyle="#ffffff";
+        ctx.lineWidth=1;
+        ctx.strokeRect(px-5, py-5, 10, 10);
+        ctx.restore();
+    });
+}
+
+function getTeamColor(t){if(!teamColors[t]){let h=(t*67+200)%360;if(h>=70&&h<=160)h=(h+120)%360;teamColors[t]="hsl("+h+",65%,60%)";}return teamColors[t];}
+
+function drawPlayers(){
+    let bs=Math.min(Math.max(scale*5,9),15),pr=Math.min(Math.max(scale*5,5),12);
+    let sN=document.getElementById("chkName").checked,sH=document.getElementById("chkHealth").checked;
+    let sHe=document.getElementById("chkHelmet").checked,sA=document.getElementById("chkArmor").checked;
+    let sW=document.getElementById("chkWeapon").checked,sD=document.getElementById("chkDir").checked;
+    let showAI=document.getElementById("chkAI").checked;
+    players.forEach(p=>{
+        let isMe=p.name==="我";
+        if(!showAI&&p.isAi&&!isMe)return;
+        let px=p.drawX*scale+offsetX,py=p.drawY*scale+offsetY;
+        if(px<-50||px>innerWidth+50||py<-50||py>innerHeight+50)return;
+
+        let tc;
+        if(isMe)tc="#3fb950";
+        else if(selectedName&&(p.name===selectedName||p.team===selectedTeam))tc="#3fb950";
+        else if(p.isTeam)tc="#58a6ff";
+        else if(p.isAi)tc="#484f58";
+        else tc=getTeamColor(p.team);
+
+        let r=isMe?pr*1.4:pr;
+
+        if(!p.isAi&&!isMe){ctx.save();ctx.beginPath();ctx.arc(px,py,r+4,0,6.28);ctx.fillStyle="rgba(248,81,73,0.15)";ctx.fill();ctx.restore();}
+
+        ctx.save();ctx.beginPath();ctx.arc(px,py,r,0,6.28);ctx.fillStyle=tc;fill();
+        ctx.strokeStyle=isMe?"rgba(63,185,80,0.6)":"rgba(255,255,255,0.15)";ctx.lineWidth=isMe?2.5:1;ctx.stroke();ctx.restore();
+
+        let fs=bs,yOff=-r-4;
+
+        if(sD){let len=isMe?r*4:r*3,a=p.direction*Math.PI/180;
+            ctx.save();ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(px+len*Math.cos(a),py+len*Math.sin(a));
+            ctx.strokeStyle=isMe?"rgba(63,185,80,0.8)":"rgba(255,200,87,0.7)";ctx.lineWidth=2;ctx.stroke();ctx.restore();}
+
+        if(sN){let nc=isMe?"#3fb950":(p.isAi?"#484f58":"#f85149");
+            ctx.save();ctx.font="600 "+fs+"px -apple-system,sans-serif";ctx.textAlign="center";
+            ctx.strokeStyle="rgba(0,0,0,0.9)";ctx.lineWidth=3;ctx.strokeText(p.name,px,py+yOff);
+            ctx.fillStyle=nc;ctx.fillText(p.name,px,py+yOff);ctx.restore();yOff-=fs+1;}
+
+        if((sHe||sA)&&!isMe&&!p.isAi){let s="";if(p.hLv>0)s+="头"+p.hLv;if(p.aLv>0)s+=" 甲"+p.aLv;if(p.bLv>0)s+=" 包"+p.bLv;
+            if(s){let sf=Math.max(fs-1,9);ctx.save();ctx.font=sf+"px -apple-system,sans-serif";ctx.textAlign="center";
+            ctx.strokeStyle="rgba(0,0,0,0.8)";ctx.lineWidth=2;ctx.strokeText(s,px,py+yOff);
+            ctx.fillStyle="#8b949e";ctx.fillText(s,px,py+yOff);ctx.restore();}}
+
+        if(sH&&!isMe){let bw=r*6,bh=3,by=py+r+5;
+            ctx.save();ctx.fillStyle="rgba(255,255,255,0.1)";roundRect(ctx,px-bw/2,by,bw,bh,1.5);ctx.fill();
+            let hp=Math.max(0,Math.min(p.health,100));ctx.fillStyle=hp>60?"#3fb950":hp>30?"#ffc857":"#f85149";
+            roundRect(ctx,px-bw/2,by,bw*(hp/100),bh,1.5);ctx.fill();ctx.restore();}
+
+        if(!isMe){let iy=py+r+16,sf=Math.max(fs-1,9),parts=[];
+            if(sW&&p.weapon)parts.push(p.weapon);if(p.dist>0)parts.push(p.dist+"m");
+            if(parts.length>0){let t=parts.join(" | ");ctx.save();ctx.font=sf+"px -apple-system,sans-serif";ctx.textAlign="center";
+                ctx.strokeStyle="rgba(0,0,0,0.8)";ctx.lineWidth=2;ctx.strokeText(t,px,iy);ctx.fillStyle="#8b949e";ctx.fillText(t,px,iy);ctx.restore();}
+            if(!p.isAi&&p.dir8&&p.dir8.length>0){iy+=sf+2;ctx.save();ctx.font=sf+"px -apple-system,sans-serif";ctx.textAlign="center";
+                ctx.strokeStyle="rgba(0,0,0,0.8)";ctx.lineWidth=2;ctx.strokeText(p.dir8,px,iy);ctx.fillStyle="#ffc857";ctx.fillText(p.dir8,px,iy);ctx.restore();}}
+    });
+}
+
+function qualityColor(q){return q>=6?"#f85149":q>=5?"#ffc857":q>=4?"#bc8cff":q>=3?"#58a6ff":"#484f58";}
+function isQualityVisible(q){if(q>=6)return document.getElementById("chkQ6").checked;if(q>=5)return document.getElementById("chkQ5").checked;if(q>=4)return document.getElementById("chkQ4").checked;if(q>=3)return document.getElementById("chkQ3").checked;return false;}
+
+function drawItems(){let fs=Math.min(Math.max(scale*4,8),14);items.forEach(it=>{if(!isQualityVisible(it.q))return;
+    let px=it.drawX*scale+offsetX,py=it.drawY*scale+offsetY;
+    if(px<-50||px>innerWidth+50||py<-50||py>innerHeight+50)return;
+    let c=qualityColor(it.q),sz=Math.max(scale*2.5,2);
+    ctx.save();ctx.beginPath();ctx.moveTo(px,py-sz);ctx.lineTo(px+sz,py);ctx.lineTo(px,py+sz);ctx.lineTo(px-sz,py);ctx.closePath();ctx.fillStyle=c;ctx.globalAlpha=0.8;ctx.fill();ctx.globalAlpha=1;ctx.restore();
+    if(scale>0.3){ctx.save();ctx.font=fs+"px -apple-system,sans-serif";ctx.fillStyle=c;ctx.textAlign="center";let lb=it.name;if(it.p>0)lb+=" $"+it.p;ctx.fillText(lb,px,py-sz-3);ctx.restore();}});}
+
+function drawBoxes(){
+    let showDead=document.getElementById("chkDeadBox").checked;
+    let fs=Math.min(Math.max(scale*4,7),12);
+    boxes.forEach(b=>{
+        if(b.t===0&&!showDead)return;
+        if(b.t===1&&!isBoxVisible(b.name))return;
+        let px=b.drawX*scale+offsetX,py=b.drawY*scale+offsetY;
+        if(px<-50||px>innerWidth+50||py<-50||py>innerHeight+50)return;
+        let sz=Math.max(scale*3,3);
+        if(b.t===0){
+            ctx.save();ctx.fillStyle="rgba(255,165,0,0.7)";ctx.fillRect(px-sz/2,py-sz/2,sz,sz);ctx.restore();
+            if(scale>0.4){ctx.save();ctx.font=fs+"px -apple-system,sans-serif";ctx.fillStyle="#ffa500";ctx.textAlign="center";ctx.fillText("盒子",px,py-sz);ctx.restore();}
+        }else{
+            let cc=imColorToCSS(b.c);
+            ctx.save();ctx.fillStyle=cc;ctx.globalAlpha=0.8;ctx.fillRect(px-sz/2,py-sz/2,sz,sz);ctx.globalAlpha=1;ctx.strokeStyle="rgba(255,255,255,0.3)";ctx.lineWidth=0.5;ctx.strokeRect(px-sz/2,py-sz/2,sz,sz);ctx.restore();
+            if(scale>0.3){ctx.save();ctx.font=fs+"px -apple-system,sans-serif";ctx.fillStyle=cc;ctx.textAlign="center";ctx.strokeStyle="rgba(0,0,0,0.8)";ctx.lineWidth=2;ctx.strokeText(b.name,px,py-sz-2);ctx.fillText(b.name,px,py-sz-2);ctx.restore();}
+        }
+    });
+}
+
+function drawKeyRooms(){let fs=Math.min(Math.max(scale*5,10),16);keyRooms.forEach(k=>{
+    let px=k.drawX*scale+offsetX,py=k.drawY*scale+offsetY;
+    if(px<-50||px>innerWidth+50||py<-50||py>innerHeight+50)return;
+    let r=Math.max(scale*5,5),c=k.lv>=6?"#f85149":k.lv>=5?"#ffc857":k.lv>=4?"#bc8cff":"#58a6ff";
+    ctx.save();ctx.beginPath();for(let i=0;i<5;i++){let a=(i*72-90)*Math.PI/180,ai=((i*72)+36-90)*Math.PI/180;if(i===0)ctx.moveTo(px+r*Math.cos(a),py+r*Math.sin(a));else ctx.lineTo(px+r*Math.cos(a),py+r*Math.sin(a));ctx.lineTo(px+r*0.45*Math.cos(ai),py+r*0.45*Math.sin(ai));}
+    ctx.closePath();ctx.fillStyle=c;ctx.globalAlpha=0.9;ctx.fill();ctx.globalAlpha=1;ctx.strokeStyle="rgba(255,255,255,0.3)";ctx.lineWidth=1;ctx.stroke();ctx.restore();
+    ctx.save();ctx.font="600 "+fs+"px -apple-system,sans-serif";ctx.textAlign="center";ctx.strokeStyle="rgba(0,0,0,0.8)";ctx.lineWidth=2;ctx.strokeText(k.name,px,py-r-4);ctx.fillStyle="#e6edf3";ctx.fillText(k.name,px,py-r-4);ctx.restore();});}
+
+function drawValuableList(){let vl=items.filter(i=>i.p>15000&&i.q>=3&&isQualityVisible(i.q));if(!vl.length)return;
+    vl.sort((a,b)=>b.p-a.p);if(vl.length>20)vl=vl.slice(0,20);
+    let lh=20,px=12,py=8,th=28,bw=280,bh=th+vl.length*lh+py*2,sx=innerWidth-bw-14,sy=50;
+    ctx.save();ctx.globalAlpha=0.88;ctx.fillStyle="#161b22";roundRect(ctx,sx,sy,bw,bh,12);ctx.fill();
+    ctx.globalAlpha=1;ctx.strokeStyle="rgba(48,54,61,0.8)";ctx.lineWidth=1;roundRect(ctx,sx,sy,bw,bh,12);ctx.stroke();
+    ctx.font="600 12px -apple-system,sans-serif";ctx.fillStyle="#ffc857";ctx.textAlign="left";ctx.fillText("HIGH VALUE",sx+px,sy+18);
+    vl.forEach((it,i)=>{let y=sy+th+i*lh+14;
+        ctx.font="600 11px -apple-system,sans-serif";ctx.fillStyle=qualityColor(it.q);ctx.textAlign="left";ctx.fillText(it.name,sx+px,y);
+        let ds="";if(it.dir)ds+=it.dir+" ";ds+=Math.round(it.d)+"m";ctx.font="10px -apple-system,sans-serif";ctx.fillStyle="#8b949e";ctx.textAlign="center";ctx.fillText(ds,sx+bw*0.62,y);
+        ctx.font="600 11px -apple-system,sans-serif";ctx.fillStyle="#ffc857";ctx.textAlign="right";ctx.fillText("$"+it.p,sx+bw-px,y);});
+    ctx.restore();}
+
+function roundRect(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.lineTo(x+w-r,y);c.quadraticCurveTo(x+w,y,x+w,y+r);c.lineTo(x+w,y+h-r);c.quadraticCurveTo(x+w,y+h,x+w-r,y+h);c.lineTo(x+r,y+h);c.quadraticCurveTo(x,y+h,x,y+h-r);c.lineTo(x,y+r);c.quadraticCurveTo(x,y,x+r,y);c.closePath();}
+</script>
+</body>
+</html>
