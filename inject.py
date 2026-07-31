@@ -69,10 +69,10 @@ def parse_load_commands(data, lc_offset, ncmds):
     
     return commands
 
-def find_padding_between_segments(data, commands, lc_offset, sizeofcmds):
+def find_padding_between_segments(data, commands, lc_offset, lc_size):
     """Find padding between load commands and next segment"""
     # Find end of load commands
-    lc_end = lc_offset + sizeofcmds
+    lc_end = lc_offset + lc_size
     
     # Find the minimum fileoff of all segments that start after load commands
     min_fileoff_after_lc = float('inf')
@@ -105,8 +105,9 @@ def add_lc_load_dylib(binary_path, dylib_path):
     ncmds = header['ncmds']
     sizeofcmds = header['sizeofcmds']
     lc_offset = header['lc_offset']
+    lc_size = header['lc_size']
     
-    print(f"Binary: ncmds={ncmds}, sizeofcmds={sizeofcmds}, lc_offset={lc_offset}")
+    print(f"Binary: ncmds={ncmds}, sizeofcmds={sizeofcmds}, lc_offset={lc_offset}, lc_size={lc_size}")
     
     # Parse existing load commands
     commands = parse_load_commands(data, lc_offset, ncmds)
@@ -143,7 +144,7 @@ def add_lc_load_dylib(binary_path, dylib_path):
     new_cmd += b'\x00' * pad_len
     
     # Find available padding
-    padding = find_padding_between_segments(data, commands, lc_offset, sizeofcmds)
+    padding = find_padding_between_segments(data, commands, lc_offset, lc_size)
     print(f"Available padding: {padding} bytes")
     
     # Strategy: Use existing padding if possible
@@ -154,16 +155,22 @@ def add_lc_load_dylib(binary_path, dylib_path):
         insert_at = actual_lc_end
         data[insert_at:insert_at + load_dylib_size] = new_cmd
         
-        # Update header
+        # Update header - BOTH sizeofcmds AND lc_size must be updated!
         new_ncmds = ncmds + 1
+        new_sizeofcmds = sizeofcmds + load_dylib_size
+        new_lc_size = lc_size + load_dylib_size
         
         struct.pack_into('<I', data, 16, new_ncmds)
+        struct.pack_into('<I', data, 20, new_sizeofcmds)
+        struct.pack_into('<Q', data, 56, new_lc_size)
         
         with open(binary_path, 'wb') as f:
             f.write(data)
         
         print(f"Success! Added LC_LOAD_DYLIB for {dylib_path}")
         print(f"  ncmds: {ncmds} -> {new_ncmds}")
+        print(f"  sizeofcmds: {sizeofcmds} -> {new_sizeofcmds}")
+        print(f"  lc_size: {lc_size} -> {new_lc_size}")
         print(f"  No file size change (used existing padding)")
         return True
     else:
