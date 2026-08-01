@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - 'index.html'
+      - 'KFOverlay_integrated.m'
       - 'kfun.ipa'
 
 jobs:
@@ -15,15 +15,41 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install insert_dylib
+        run: |
+          git clone https://github.com/Tyilo/insert_dylib.git
+          cd insert_dylib
+          make
+          cp insert_dylib /usr/local/bin/
+
+      - name: Compile KFOverlay.dylib
+        run: |
+          xcrun --sdk iphoneos clang \
+            -fPIC -shared -fobjc-arc -arch arm64 \
+            -isysroot $(xcrun --sdk iphoneos --show-sdk-path) \
+            -framework Foundation -framework UIKit \
+            -lobjc -lSystem -O2 \
+            -o KFOverlay.dylib KFOverlay_integrated.m
+
       - name: Integrate into kfun.ipa
         run: |
           unzip -o kfun.ipa -d work_dir
           APP_DIR=$(find work_dir -name "*.app" -type d | head -1)
           
-          cp index.html "$APP_DIR/index.html"
+          mkdir -p "$APP_DIR/Frameworks"
+          cp KFOverlay.dylib "$APP_DIR/Frameworks/"
           
-          echo "=== index.html replaced ==="
-          ls -la "$APP_DIR/index.html"
+          BINARY="$APP_DIR/kfun"
+          
+          insert_dylib --inplace --weak \
+            "@executable_path/Frameworks/KFOverlay.dylib" \
+            "$BINARY"
+          
+          echo "=== Verify injection ==="
+          otool -L "$BINARY" | grep -i overlay
+          
+          echo "=== Verify Mach-O ==="
+          file "$BINARY"
           
           cd work_dir
           zip -r ../kfun_with_overlay.ipa Payload/
